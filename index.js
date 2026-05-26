@@ -1,9 +1,5 @@
-import express from "express";
 import axios from "axios";
 import { MongoClient } from "mongodb";
-
-const app = express();
-const PORT = process.env.PORT || 3000;
 
 const ZILLOW_API_URL = process.env.ZILLOW_API_URL;
 const ZILLOW_COOKIE = process.env.ZILLOW_COOKIE;
@@ -105,11 +101,11 @@ async function checkLeads() {
 
     const sent = await sendToZapier(lead);
 
-if (!sent) {
-  continue;
-}
+    if (!sent) {
+      continue;
+    }
 
-await seenCollection.insertOne({
+    await seenCollection.insertOne({
       uniqueId,
       conversationId,
       renterName: lead.renterName,
@@ -121,30 +117,14 @@ await seenCollection.insertOne({
   }
 }
 
-setInterval(() => {
-  checkLeads().catch(err => {
-    console.error("Lead check failed:", err?.response?.data || err.message);
+checkLeads()
+  .then(async () => {
+    console.log("Cron job complete");
+    await client.close();
+    process.exit(0);
+  })
+  .catch(async err => {
+    console.error("Cron job failed:", err?.response?.data || err.message);
+    await client.close();
+    process.exit(1);
   });
-}, 12 * 60 * 1000);
-
-app.get("/", (req, res) => {
-  res.send("Zillow to Follow Up Boss poller is running.");
-});
-
-app.get("/run-now", async (req, res) => {
-  try {
-    await checkLeads();
-    res.send("Checked Zillow leads.");
-  } catch (err) {
-    console.error("Run-now failed:", err?.response?.data || err.message);
-    res.status(500).send(err.message);
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-
-  checkLeads().catch(err => {
-    console.error("Initial check failed:", err?.response?.data || err.message);
-  });
-});
