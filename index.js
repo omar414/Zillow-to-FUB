@@ -44,9 +44,9 @@ async function fetchZillowLeads() {
       }
     }
   );
-   console.log(
-    JSON.stringify(response.data, null, 2)
-  );
+  console.log(
+  `Fetched ${response.data?.data?.conversations?.length || 0} conversations`
+);
 
   return response.data;
 }
@@ -62,11 +62,7 @@ async function checkLeads() {
   const seen = loadSeen();
   const data = await fetchZillowLeads();
 
-  const conversations =
-    data?.conversations ||
-    data?.data?.conversations ||
-    data?.latestConversations ||
-    [];
+const conversations = data?.data?.conversations || [];
 
   for (const item of conversations) {
     const id = item.id || item.conversationId || item.linkedId;
