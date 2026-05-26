@@ -111,7 +111,7 @@ setInterval(() => {
   checkLeads().catch(err => {
     console.error("Lead check failed:", err?.response?.data || err.message);
   });
-}, 2 * 60 * 1000);
+}, 12 * 60 * 1000);
 
 app.get("/", (req, res) => {
   res.send("Zillow to Follow Up Boss poller is running.");
