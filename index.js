@@ -48,7 +48,17 @@ function extractConversations(data) {
 }
 
 async function sendToZapier(lead) {
-  await axios.post(ZAPIER_WEBHOOK_URL, lead);
+  try {
+    await axios.post(ZAPIER_WEBHOOK_URL, lead);
+    return true;
+  } catch (err) {
+    console.error(
+      "Zapier failed:",
+      lead.renterName,
+      err?.response?.data || err.message
+    );
+    return false;
+  }
 }
 
 async function checkLeads() {
@@ -93,9 +103,13 @@ async function checkLeads() {
 
     console.log(`Sending to Zapier: ${lead.renterName} | ${lead.renterPhone}`);
 
-    await sendToZapier(lead);
+    const sent = await sendToZapier(lead);
 
-    await seenCollection.insertOne({
+if (!sent) {
+  continue;
+}
+
+await seenCollection.insertOne({
       uniqueId,
       conversationId,
       renterName: lead.renterName,
