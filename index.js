@@ -44,9 +44,7 @@ async function fetchZillowLeads() {
       }
     }
   );
-  console.log(
-  `Fetched ${response.data?.data?.conversations?.length || 0} conversations`
-);
+  console.log(`Fetched ${conversations.length} conversations`);
 
   return response.data;
 }
