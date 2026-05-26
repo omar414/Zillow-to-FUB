@@ -24,13 +24,13 @@ async function fetchZillowLeads() {
   const response = await axios.post(
     ZILLOW_API_URL,
 
-    // POST BODY
     {
-      offset: 0,
-      limit: 20
+      clientTimeZone: "Asia/Beirut",
+      folder: "INBOX",
+      readRepliedStatus: "SHOW_ALL",
+      renterProgressStatus: "SHOW_ALL"
     },
 
-    // AXIOS CONFIG
     {
       headers: {
         Cookie: ZILLOW_COOKIE,
