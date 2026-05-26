@@ -79,8 +79,9 @@ async function checkLeads() {
   console.log("Top keys:", Object.keys(data || {}));
   console.log("Response keys:", Object.keys(data?.response || {}));
 
-  const conversations = extractConversations(data);
-
+  function extractConversations(data) {
+  return data?.response?.conversations || [];
+}
   console.log(`Fetched ${conversations.length} conversations`);
 
   for (const item of conversations) {
