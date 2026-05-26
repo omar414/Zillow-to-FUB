@@ -77,49 +77,30 @@ async function checkLeads() {
   const data = await fetchZillowLeads();
 
   console.log("Top keys:", Object.keys(data || {}));
-  console.log("Data keys:", Object.keys(data?.data || {}));
+  console.log("Response keys:", Object.keys(data?.response || {}));
 
- function extractConversations(data) {
-  return (
-    data?.response?.latestConversations ||
-    data?.response?.conversations ||
-    data?.response?.data?.latestConversations ||
-    data?.response?.data?.conversations ||
-    data?.data?.latestConversations ||
-    data?.data?.conversations ||
-    data?.latestConversations ||
-    data?.conversations ||
-    []
-  );
-}
-  console.log("Top keys:", Object.keys(data || {}));
-console.log("Response keys:", Object.keys(data?.response || {}));
+  const conversations = extractConversations(data);
+
+  console.log(`Fetched ${conversations.length} conversations`);
 
   for (const item of conversations) {
     const id = item.conversationId || item.id || item.linkedId;
 
     if (!id) continue;
-
-    if (seen.includes(id)) {
-      continue;
-    }
+    if (seen.includes(id)) continue;
 
     const lead = {
       source: "Zillow",
       zillowConversationId: id,
-      renterName: item.renterName || item.renter?.name || "",
-      renterPhone: item.renterPhone || item.renter?.phone || "",
-      renterEmail: item.renterEmail || item.renter?.email || "",
-      propertyAddress:
-        item.listingDetails?.displayAddress ||
-        item.displayAddress ||
-        "",
+      renterName: item.renterName || "",
+      renterPhone: item.renterPhone || "",
+      renterEmail: item.renterEmail || "",
+      propertyAddress: item.listingDetails?.displayAddress || "",
       listingAlias: item.listingDetails?.listingAlias || "",
       status: item.statusLabel?.text || "",
       hasUnreadMessage: item.hasUnreadMessage || false,
       latestMessage: item.mostRecentMessage?.message || "",
-      latestMessageDateMs: item.mostRecentMessage?.messageDateMs || "",
-      raw: item
+      latestMessageDateMs: item.mostRecentMessage?.messageDateMs || ""
     };
 
     console.log(`New lead sent to Zapier: ${lead.renterName} | ${lead.renterPhone}`);
