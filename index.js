@@ -79,9 +79,21 @@ async function checkLeads() {
   console.log("Top keys:", Object.keys(data || {}));
   console.log("Data keys:", Object.keys(data?.data || {}));
 
-  const conversations = extractConversations(data);
-
-  console.log(`Fetched ${conversations.length} conversations`);
+ function extractConversations(data) {
+  return (
+    data?.response?.latestConversations ||
+    data?.response?.conversations ||
+    data?.response?.data?.latestConversations ||
+    data?.response?.data?.conversations ||
+    data?.data?.latestConversations ||
+    data?.data?.conversations ||
+    data?.latestConversations ||
+    data?.conversations ||
+    []
+  );
+}
+  console.log("Top keys:", Object.keys(data || {}));
+console.log("Response keys:", Object.keys(data?.response || {}));
 
   for (const item of conversations) {
     const id = item.conversationId || item.id || item.linkedId;
