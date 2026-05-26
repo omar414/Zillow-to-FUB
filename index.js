@@ -51,14 +51,7 @@ async function fetchZillowLeads() {
 }
 
 function extractConversations(data) {
-  return (
-    data?.data?.latestConversations ||
-    data?.data?.conversations ||
-    data?.latestConversations ||
-    data?.conversations ||
-    data?.data?.inbox?.latestConversations ||
-    []
-  );
+  return data?.response?.conversations || [];
 }
 
 async function sendToZapier(lead) {
@@ -79,9 +72,8 @@ async function checkLeads() {
   console.log("Top keys:", Object.keys(data || {}));
   console.log("Response keys:", Object.keys(data?.response || {}));
 
-  function extractConversations(data) {
-  return data?.response?.conversations || [];
-}
+  const conversations = extractConversations(data);
+
   console.log(`Fetched ${conversations.length} conversations`);
 
   for (const item of conversations) {
@@ -104,7 +96,9 @@ async function checkLeads() {
       latestMessageDateMs: item.mostRecentMessage?.messageDateMs || ""
     };
 
-    console.log(`New lead sent to Zapier: ${lead.renterName} | ${lead.renterPhone}`);
+    console.log(
+      `New lead sent to Zapier: ${lead.renterName} | ${lead.renterPhone}`
+    );
 
     await sendToZapier(lead);
 
