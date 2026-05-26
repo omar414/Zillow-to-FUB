@@ -62,7 +62,11 @@ async function checkLeads() {
   const seen = loadSeen();
   const data = await fetchZillowLeads();
 
-const conversations = data?.data?.conversations || [];
+const conversations =
+  data?.data?.latestConversations ||
+  data?.data?.conversations ||
+  data?.latestConversations ||
+  [];
 
   for (const item of conversations) {
     const id = item.id || item.conversationId || item.linkedId;
