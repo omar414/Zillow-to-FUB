@@ -21,16 +21,33 @@ function saveSeen(ids) {
 }
 
 async function fetchZillowLeads() {
-  const response = await axios.post(ZILLOW_API_URL, {
-    headers: {
-      Cookie: ZILLOW_COOKIE,
-      "User-Agent": "Mozilla/5.0",
-      Accept: "application/json"
+  const response = await axios.post(
+    ZILLOW_API_URL,
+
+    // POST BODY
+    {
+      offset: 0,
+      limit: 20
+    },
+
+    // AXIOS CONFIG
+    {
+      headers: {
+        Cookie: ZILLOW_COOKIE,
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+        Accept: "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Content-Type": "application/json",
+        Origin: "https://www.zillow.com",
+        Referer: "https://www.zillow.com/rental-manager/inbox"
+      }
     }
-  });
+  );
 
   return response.data;
 }
+
 
 async function sendToZapier(lead) {
   await axios.post(ZAPIER_WEBHOOK_URL, lead);
