@@ -1,6 +1,6 @@
 import express from "express";
 import axios from "axios";
-import fs from "fs";
+import { MongoClient } from "mongodb";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -8,20 +8,13 @@ const PORT = process.env.PORT || 3000;
 const ZILLOW_API_URL = process.env.ZILLOW_API_URL;
 const ZILLOW_COOKIE = process.env.ZILLOW_COOKIE;
 const ZAPIER_WEBHOOK_URL = process.env.ZAPIER_WEBHOOK_URL;
+const MONGODB_URI = process.env.MONGODB_URI;
 
-const SEEN_FILE = "./seen.json";
+const client = new MongoClient(MONGODB_URI);
 
-function loadSeen() {
-  try {
-    if (!fs.existsSync(SEEN_FILE)) return [];
-    return JSON.parse(fs.readFileSync(SEEN_FILE, "utf8"));
-  } catch {
-    return [];
-  }
-}
-
-function saveSeen(ids) {
-  fs.writeFileSync(SEEN_FILE, JSON.stringify(ids, null, 2));
+async function getSeenCollection() {
+  await client.connect();
+  return client.db("zillow_to_fub").collection("seen_messages");
 }
 
 async function fetchZillowLeads() {
@@ -55,105 +48,68 @@ function extractConversations(data) {
 }
 
 async function sendToZapier(lead) {
-  if (!ZAPIER_WEBHOOK_URL) {
-    console.log("Missing ZAPIER_WEBHOOK_URL");
-    return;
-  }
-
   await axios.post(ZAPIER_WEBHOOK_URL, lead);
 }
 
 async function checkLeads() {
   console.log("Checking Zillow leads...");
 
-  const seen = loadSeen();
-
+  const seenCollection = await getSeenCollection();
   const data = await fetchZillowLeads();
 
-  const conversations = extractConversations(data);
+  const conversations = extractConversations(data).slice(0, 10);
 
-  console.log(`Fetched ${conversations.length} conversations`);
+  console.log(`Fetched ${conversations.length} recent conversations`);
 
   for (const item of conversations) {
-    const conversationId =
-      item.conversationId ||
-      item.id ||
-      item.linkedId;
+    const conversationId = item.conversationId || item.id || item.linkedId;
+    const latestMessageDateMs = item.mostRecentMessage?.messageDateMs;
 
-    const latestMessageDateMs =
-      item.mostRecentMessage?.messageDateMs || "";
+    if (!conversationId || !latestMessageDateMs) continue;
 
-    const uniqueId =
-      `${conversationId}_${latestMessageDateMs}`;
+    const uniqueId = `${conversationId}_${latestMessageDateMs}`;
 
-    if (!conversationId) continue;
+    const alreadySeen = await seenCollection.findOne({ uniqueId });
 
-    if (seen.includes(uniqueId)) {
+    if (alreadySeen) {
+      console.log(`Skipped duplicate: ${item.renterName}`);
       continue;
     }
 
     const lead = {
       source: "Zillow",
-
+      uniqueId,
       zillowConversationId: conversationId,
-
-      renterName:
-        item.renterName ||
-        item.renter?.name ||
-        "",
-
-      renterPhone:
-        item.renterPhone ||
-        item.renter?.phone ||
-        "",
-
-      renterEmail:
-        item.renterEmail ||
-        item.renter?.email ||
-        "",
-
-      propertyAddress:
-        item.listingDetails?.displayAddress ||
-        item.displayAddress ||
-        "",
-
-      listingAlias:
-        item.listingDetails?.listingAlias ||
-        "",
-
-      status:
-        item.statusLabel?.text ||
-        item.status ||
-        "",
-
-      latestMessage:
-        item.mostRecentMessage?.message ||
-        "",
-
+      renterName: item.renterName || "",
+      renterPhone: item.renterPhone || "",
+      renterEmail: item.renterEmail || "",
+      propertyAddress: item.listingDetails?.displayAddress || "",
+      listingAlias: item.listingDetails?.listingAlias || "",
+      status: item.statusLabel?.text || "",
+      latestMessage: item.mostRecentMessage?.message || "",
       latestMessageDateMs,
-
-      hasUnreadMessage:
-        item.hasUnreadMessage || false
+      hasUnreadMessage: item.hasUnreadMessage || false
     };
 
-    console.log(
-      `Sending to Zapier: ${lead.renterName} | ${lead.renterPhone}`
-    );
+    console.log(`Sending to Zapier: ${lead.renterName} | ${lead.renterPhone}`);
 
     await sendToZapier(lead);
 
-    seen.push(uniqueId);
-
-    saveSeen(seen);
+    await seenCollection.insertOne({
+      uniqueId,
+      conversationId,
+      renterName: lead.renterName,
+      renterPhone: lead.renterPhone,
+      propertyAddress: lead.propertyAddress,
+      latestMessageDateMs,
+      sentAt: new Date()
+    });
   }
 }
 
 setInterval(() => {
   checkLeads().catch(err => {
-    console.error(
-      "Lead check failed:",
-      err?.response?.data || err.message
-    );
+    console.error("Lead check failed:", err?.response?.data || err.message);
   });
 }, 12 * 60 * 1000);
 
@@ -166,11 +122,7 @@ app.get("/run-now", async (req, res) => {
     await checkLeads();
     res.send("Checked Zillow leads.");
   } catch (err) {
-    console.error(
-      "Run-now failed:",
-      err?.response?.data || err.message
-    );
-
+    console.error("Run-now failed:", err?.response?.data || err.message);
     res.status(500).send(err.message);
   }
 });
@@ -179,9 +131,6 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 
   checkLeads().catch(err => {
-    console.error(
-      "Initial check failed:",
-      err?.response?.data || err.message
-    );
+    console.error("Initial check failed:", err?.response?.data || err.message);
   });
 });
