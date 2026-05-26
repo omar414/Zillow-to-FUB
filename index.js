@@ -12,8 +12,12 @@ const ZAPIER_WEBHOOK_URL = process.env.ZAPIER_WEBHOOK_URL;
 const SEEN_FILE = "./seen.json";
 
 function loadSeen() {
-  if (!fs.existsSync(SEEN_FILE)) return [];
-  return JSON.parse(fs.readFileSync(SEEN_FILE, "utf8"));
+  try {
+    if (!fs.existsSync(SEEN_FILE)) return [];
+    return JSON.parse(fs.readFileSync(SEEN_FILE, "utf8"));
+  } catch {
+    return [];
+  }
 }
 
 function saveSeen(ids) {
@@ -23,14 +27,12 @@ function saveSeen(ids) {
 async function fetchZillowLeads() {
   const response = await axios.post(
     ZILLOW_API_URL,
-
     {
       clientTimeZone: "Asia/Beirut",
       folder: "INBOX",
       readRepliedStatus: "SHOW_ALL",
       renterProgressStatus: "SHOW_ALL"
     },
-
     {
       headers: {
         Cookie: ZILLOW_COOKIE,
@@ -44,15 +46,27 @@ async function fetchZillowLeads() {
       }
     }
   );
-  console.log(
-  `Fetched ${response.data?.data?.conversations?.length || 0} conversations`
-);
 
   return response.data;
 }
 
+function extractConversations(data) {
+  return (
+    data?.data?.latestConversations ||
+    data?.data?.conversations ||
+    data?.latestConversations ||
+    data?.conversations ||
+    data?.data?.inbox?.latestConversations ||
+    []
+  );
+}
 
 async function sendToZapier(lead) {
+  if (!ZAPIER_WEBHOOK_URL) {
+    console.log("Missing ZAPIER_WEBHOOK_URL");
+    return;
+  }
+
   await axios.post(ZAPIER_WEBHOOK_URL, lead);
 }
 
@@ -62,18 +76,24 @@ async function checkLeads() {
   const seen = loadSeen();
   const data = await fetchZillowLeads();
 
-const conversations =
-  data?.data?.latestConversations ||
-  data?.data?.conversations ||
-  data?.latestConversations ||
-  [];
-console.log(`Fetched ${conversations.length} conversations`);
-  for (const item of conversations) {
-    const id = item.id || item.conversationId || item.linkedId;
+  console.log("Top keys:", Object.keys(data || {}));
+  console.log("Data keys:", Object.keys(data?.data || {}));
 
-    if (!id || seen.includes(id)) continue;
+  const conversations = extractConversations(data);
+
+  console.log(`Fetched ${conversations.length} conversations`);
+
+  for (const item of conversations) {
+    const id = item.conversationId || item.id || item.linkedId;
+
+    if (!id) continue;
+
+    if (seen.includes(id)) {
+      continue;
+    }
 
     const lead = {
+      source: "Zillow",
       zillowConversationId: id,
       renterName: item.renterName || item.renter?.name || "",
       renterPhone: item.renterPhone || item.renter?.phone || "",
@@ -82,11 +102,15 @@ console.log(`Fetched ${conversations.length} conversations`);
         item.listingDetails?.displayAddress ||
         item.displayAddress ||
         "",
-      status: item.statusLabel?.text || item.status || "",
+      listingAlias: item.listingDetails?.listingAlias || "",
+      status: item.statusLabel?.text || "",
+      hasUnreadMessage: item.hasUnreadMessage || false,
+      latestMessage: item.mostRecentMessage?.message || "",
+      latestMessageDateMs: item.mostRecentMessage?.messageDateMs || "",
       raw: item
     };
 
-    console.log("New lead:", lead.renterName);
+    console.log(`New lead sent to Zapier: ${lead.renterName} | ${lead.renterPhone}`);
 
     await sendToZapier(lead);
 
@@ -97,7 +121,7 @@ console.log(`Fetched ${conversations.length} conversations`);
 
 setInterval(() => {
   checkLeads().catch(err => {
-    console.error("Lead check failed:", err.message);
+    console.error("Lead check failed:", err?.response?.data || err.message);
   });
 }, 2 * 60 * 1000);
 
@@ -110,11 +134,14 @@ app.get("/run-now", async (req, res) => {
     await checkLeads();
     res.send("Checked Zillow leads.");
   } catch (err) {
+    console.error("Run-now failed:", err?.response?.data || err.message);
     res.status(500).send(err.message);
   }
 });
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  checkLeads().catch(console.error);
+  checkLeads().catch(err => {
+    console.error("Initial check failed:", err?.response?.data || err.message);
+  });
 });
