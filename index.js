@@ -21,7 +21,7 @@ function saveSeen(ids) {
 }
 
 async function fetchZillowLeads() {
-  const response = await axios.get(ZILLOW_API_URL, {
+  const response = await axios.post(ZILLOW_API_URL, {
     headers: {
       Cookie: ZILLOW_COOKIE,
       "User-Agent": "Mozilla/5.0",
