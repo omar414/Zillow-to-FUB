@@ -11,12 +11,15 @@ const ZAPIER_WEBHOOK_URL = process.env.ZAPIER_WEBHOOK_URL;
 const MONGODB_URI = process.env.MONGODB_URI;
 
 const client = new MongoClient(MONGODB_URI);
-
-let isChecking = false;
+let seenCollection;
 
 async function getSeenCollection() {
-  await client.connect();
-  return client.db("zillow_to_fub").collection("seen_messages");
+  if (!seenCollection) {
+    await client.connect();
+    seenCollection = client.db("zillow_to_fub").collection("seen_messages");
+  }
+
+  return seenCollection;
 }
 
 async function fetchZillowLeads() {
