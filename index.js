@@ -11,7 +11,9 @@ const ZAPIER_WEBHOOK_URL = process.env.ZAPIER_WEBHOOK_URL;
 const MONGODB_URI = process.env.MONGODB_URI;
 
 const client = new MongoClient(MONGODB_URI);
+
 let seenCollection;
+let isChecking = false;
 
 async function getSeenCollection() {
   if (!seenCollection) {
@@ -57,7 +59,11 @@ async function sendToZapier(lead) {
     await axios.post(ZAPIER_WEBHOOK_URL, lead);
     return true;
   } catch (err) {
-    console.error("Zapier failed:", lead.renterName, err?.response?.data || err.message);
+    console.error(
+      "Zapier failed:",
+      lead.renterName,
+      err?.response?.data || err.message
+    );
     return false;
   }
 }
@@ -86,6 +92,7 @@ async function checkLeads() {
       if (!conversationId || !latestMessageDateMs) continue;
 
       const uniqueId = `${conversationId}_${latestMessageDateMs}`;
+
       const alreadySeen = await seenCollection.findOne({ uniqueId });
 
       if (alreadySeen) {
